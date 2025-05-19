@@ -1,0 +1,9 @@
+name = "ada_playground"
+description = "Shiny new project"
+version = "0.1.0-dev"
+
+authors = ["Robin Leroy"]
+maintainers = ["Robin Leroy <eggrobin@unicode.org>"]
+maintainers-logins = ["eggrobin"]
+
+executables = ["ada_playground"]
