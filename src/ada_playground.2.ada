@@ -2,9 +2,16 @@ with Ada.Long_Long_Integer_Text_IO;
 with Ada.Text_IO;
 
 procedure Ada_Playground is
-   type Block is range -1 .. Integer'Last;
-   Empty_Block : constant Block := -1;
-   subtype File_ID is Block range 0 .. Block'Last;
+   type File_ID is new Natural;
+   type Block (Empty : Boolean := True) is
+      record
+         case Empty is
+            when True =>
+               null;
+            when False =>
+               File : File_ID;
+         end case;
+      end record;
 
    type Block_Position is new Natural;
    subtype Map_Size is Block_Position range 0 .. 9;
@@ -21,16 +28,16 @@ procedure Ada_Playground is
    Empty_Disk_Map : constant Disk_Map (0 .. -1) := (others => (1, 0));
 
    package Map_Size_IO is new Ada.Text_IO.Integer_IO (Map_Size);
-   package Block_IO is new Ada.Text_IO.Integer_IO (Block);
+   package File_ID_IO is new Ada.Text_IO.Integer_IO (File_ID);
 
    procedure Put_Disk_If_Small (Disk : Blocks) is
    begin
       if Disk'Length < 80 then
          for B of Disk loop
-            if B = Empty_Block then
+            if B.Empty then
                Ada.Text_IO.Put ('.');
             else
-               Block_IO.Put (B, Width => 1);
+               File_ID_IO.Put (B.File, Width => 1);
             end if;
          end loop;
          Ada.Text_IO.New_Line;
@@ -76,11 +83,11 @@ procedure Ada_Playground is
          for File_ID in Map'Range loop
             Result (Next_Block ..
                     Next_Block + Map (File_ID).Size - 1) :=
-               (others => File_ID);
+               (others => (Empty => False, File => File_ID));
             Next_Block := Next_Block + Map (File_ID).Size;
             Result (Next_Block ..
                     Next_Block + Map (File_ID).Trailing_Free_Space - 1) :=
-               (others => Empty_Block);
+               (others => (Empty => True));
             Next_Block := Next_Block + Map (File_ID).Trailing_Free_Space;
          end loop;
          return Result;
@@ -93,15 +100,15 @@ procedure Ada_Playground is
    begin
       loop
          Put_Disk_If_Small (Disk);
-         while Disk (Next_Empty) /= Empty_Block loop
+         while not Disk (Next_Empty).Empty loop
             Next_Empty := Next_Empty + 1;
          end loop;
-         while Disk (Block_To_Move) = Empty_Block loop
+         while Disk (Block_To_Move).Empty loop
             Block_To_Move := Block_To_Move - 1;
          end loop;
          exit when Block_To_Move < Next_Empty;
          Disk (Next_Empty)    := Disk (Block_To_Move);
-         Disk (Block_To_Move) := Empty_Block;
+         Disk (Block_To_Move) := (Empty => True);
       end loop;
    end Fragment;
 
@@ -114,17 +121,18 @@ procedure Ada_Playground is
             File_Location : Block_Position := Disk'First;
             Candidate     : Block_Position := Disk'First;
          begin
-            while Disk (File_Location) /= File_To_Move loop
+            while Disk (File_Location) /= (Empty => False,
+                                           File  => File_To_Move) loop
                File_Location := File_Location + 1;
             end loop;
             loop
-               while Disk (Candidate) /= Empty_Block loop
+               while not Disk (Candidate).Empty loop
                   Candidate := Candidate + 1;
                end loop;
                exit when Candidate > File_Location;
                for B in Candidate ..
                         Candidate + Map (File_To_Move).Size - 1 loop
-                  if Disk (B) /= Empty_Block then
+                  if not Disk (B).Empty then
                      Candidate := B + 1;
                      goto Next_Candidate;
                   end if;
@@ -134,7 +142,7 @@ procedure Ada_Playground is
                         File_Location + Map (File_To_Move).Size - 1);
                Disk (File_Location ..
                      File_Location + Map (File_To_Move).Size - 1) :=
-                  (others => Empty_Block);
+                  (others => (Empty => True));
                exit;
                <<Next_Candidate>>
             end loop;
@@ -148,10 +156,10 @@ procedure Ada_Playground is
       Result : Long_Long_Integer := 0;
    begin
       for Block_Position in Disk'Range loop
-         if Disk (Block_Position) /= Empty_Block then
+         if not Disk (Block_Position).Empty then
             Result := Result +
                Long_Long_Integer (Block_Position) *
-                  Long_Long_Integer (Disk (Block_Position));
+                  Long_Long_Integer (Disk (Block_Position).File);
          end if;
       end loop;
       return Result;
